@@ -1,6 +1,13 @@
 <?php
+
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+
 session_start();
-require_once 'utils.php';
+require_once __DIR__ . '/utils.php';
+
+
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     send_json(["success" => false, "message" => "Invalid request"], 405);
@@ -21,3 +28,4 @@ if ($result['success']) {
 }
 send_json($result);
 ?>
+
