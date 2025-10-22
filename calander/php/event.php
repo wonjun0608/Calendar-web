@@ -46,6 +46,7 @@ switch ($action) {
         $date  = trim($_POST['event_date'] ?? '');
         $time  = trim($_POST['event_time'] ?? '');
         $desc  = trim($_POST['description'] ?? '');
+        $color = $_POST['color'] ?? '#007bff';  //
         if ($id === 0 || $title === '' || $date === '' || $time === '') {
             send_json(["success" => false, "message" => "Missing fields"]);
         }
@@ -92,13 +93,14 @@ switch ($action) {
     $date = trim($_POST['event_date'] ?? '');
     $time = trim($_POST['event_time'] ?? '');
     $desc = trim($_POST['description'] ?? '');
-    $participants = $_POST['participants'] ?? ''; 
+    $participants = $_POST['participants'] ?? '';
+    $color = $_POST['color'] ?? '#007bff'; 
 
     if ($title === '' || $date === '' || $time === '' || $participants === '') {
         send_json(["success" => false, "message" => "Missing fields"]);
     }
 
-    $result = add_group_event($mysqli, $_SESSION['user_id'], $title, $date, $time, $desc, $participants);
+    $result = add_group_event($mysqli, $_SESSION['user_id'], $title, $date, $time, $desc, $participants, $color);
     send_json($result);
     break;
 
