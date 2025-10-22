@@ -13,6 +13,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('eventForm').onsubmit = submitEvent;
     document.getElementById('shareBtn').onclick = shareCalendar;
 
+    document.querySelectorAll('.color-option').forEach(opt => {
+        opt.addEventListener('click', function() {
+            const selectedColor = this.getAttribute('data-color');
+            document.getElementById('eventColor').value = selectedColor;
+
+            
+            document.querySelectorAll('.color-option').forEach(o => o.style.outline = '');
+            this.style.outline = '3px solid black';
+        });
+    });
+
     const delBtn = document.getElementById('deleteEventBtn');
     if (delBtn) {
         delBtn.addEventListener('click', () => {
@@ -123,6 +134,14 @@ function openEditModal(ev) {
     document.getElementById('eventTime').value = ev.event_time;
     document.getElementById('eventTitle').value = ev.title;
     document.getElementById('eventDescription').value = ev.description;
+    if (ev.color) {
+    document.getElementById('eventColor').value = ev.color;
+
+   
+    document.querySelectorAll('.color-option').forEach(o => {
+        o.style.outline = (o.getAttribute('data-color') === ev.color) ? '3px solid black' : '';
+    });
+}
 
     const makeGroup = document.getElementById('makeGroup');        
     const participants = document.getElementById('participants');   
@@ -151,6 +170,7 @@ function submitEvent(e) {
     const form = e.target;
     const formData = new FormData(form);
     formData.append('csrf_token', document.getElementById('csrfToken').value);
+    formData.append('color', document.getElementById('eventColor').value);
 
     const makeGroup = document.getElementById('makeGroup');
     const participants = document.getElementById('participants');
@@ -276,7 +296,7 @@ function renderEvents(events) {
                 div.style.backgroundColor = '#f39c12';
             } else {
                 div.textContent = ev.title;
-                div.style.backgroundColor = tag?.color || '#007bff';
+                div.style.backgroundColor = ev.color || tag?.color || '#007bff';
             }
         div.onclick = (event) => {
             event.stopPropagation();

@@ -49,7 +49,7 @@ switch ($action) {
         if ($id === 0 || $title === '' || $date === '' || $time === '') {
             send_json(["success" => false, "message" => "Missing fields"]);
         }
-        $result = edit_event($mysqli, $_SESSION['user_id'], $id, $title, $date, $time, $desc);
+        $result = edit_event($mysqli, $_SESSION['user_id'], $id, $title, $date, $time, $desc, $color);
         send_json($result);
         break;
 
