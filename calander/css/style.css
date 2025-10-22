@@ -34,9 +34,9 @@ td:hover { background: #f3f3f3; cursor: pointer; }
 }
 .modal-content {
   background: white;
-  margin: 10% auto;
+  margin: 1% auto;
   padding: 20px;
-  width: 300px;
+  width: 330px;
   border-radius: 10px;
 }
 #closeModal {

@@ -13,9 +13,29 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('eventForm').onsubmit = submitEvent;
     document.getElementById('shareBtn').onclick = shareCalendar;
 
+    const delBtn = document.getElementById('deleteEventBtn');
+    if (delBtn) {
+        delBtn.addEventListener('click', () => {
+            const eventId = document.getElementById('eventId').value;
+            if (!eventId) return;
+
+            const formData = new FormData();
+            formData.append('action', 'delete');
+            formData.append('event_id', eventId);
+            formData.append('csrf_token', document.getElementById('csrfToken').value);
+
+            fetch('./php/event.php', { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        closeModal();
+                        renderCalendar(); 
+                    }
+                })
+                .catch(err => console.error('Error while deleting event:', err));
+        });
+    }
 });
-
-
 
 
 function renderCalendar() {
@@ -64,15 +84,30 @@ function openModal(year, month, day) {
     form.reset();
     form.action.value = 'add';
 
+    const makeGroup = document.getElementById('makeGroup');        
+    const participants = document.getElementById('participants');   
+
+    if (makeGroup) makeGroup.checked = false;                        
+    if (participants) {                           
+        participants.value = '';                 
+        participants.style.display = 'none';      
+    }                                                           
+
     const correctedMonth = month + 1;
     const maxDay = new Date(year, correctedMonth, 0).getDate();
     const correctedDay = Math.min(day, maxDay);
 
+    
     document.getElementById('eventDate').value =
         `${year}-${String(correctedMonth).padStart(2, '0')}-${String(correctedDay).padStart(2, '0')}`;
 
     modal.style.display = 'block';
+
+    
+    const delBtn = document.getElementById('deleteEventBtn');
+    if (delBtn) delBtn.style.display = 'none';
 }
+
 // edit
 function openEditModal(ev) {
     const modal = document.getElementById('eventModal');
@@ -82,13 +117,27 @@ function openEditModal(ev) {
     document.getElementById('modalTitle').textContent = 'Edit Event';
     form.action.value = 'edit';
 
+    
     document.getElementById('eventId').value = ev.event_id;
     document.getElementById('eventDate').value = ev.event_date;
     document.getElementById('eventTime').value = ev.event_time;
     document.getElementById('eventTitle').value = ev.title;
     document.getElementById('eventDescription').value = ev.description;
 
+    const makeGroup = document.getElementById('makeGroup');        
+    const participants = document.getElementById('participants');   
+
+    if (makeGroup) makeGroup.checked = false;       
+    if (participants) {                             
+        participants.value = '';                    
+        participants.style.display = 'none';        
+    } 
+
     modal.style.display = 'block';
+
+    
+    const delBtn = document.getElementById('deleteEventBtn');
+    if (delBtn) delBtn.style.display = 'inline-block';
 }
 
 
@@ -103,15 +152,34 @@ function submitEvent(e) {
     const formData = new FormData(form);
     formData.append('csrf_token', document.getElementById('csrfToken').value);
 
-    fetch('php/event.php', { method: 'POST', body: formData })
+    const makeGroup = document.getElementById('makeGroup');
+    const participants = document.getElementById('participants');
+
+    if (makeGroup && makeGroup.checked) {
+        form.querySelector('input[name="action"]').value = 'group_add';
+        formData.set('action', 'group_add');
+
+        const usernames = participants.value.trim();
+        if (!usernames) {
+            alert("Please enter at least one username for group event.");
+            return;
+        }
+        formData.append('participants', usernames);
+    }
+
+    fetch('./php/event.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(res => {
-        if (res.success) {
-            closeModal();
-            renderCalendar();
-        } else alert(res.message);
-        });
+            if (res.success) {
+                closeModal();
+                renderCalendar();
+            } else {
+                alert(res.message || "Failed to save event.");
+            }
+        })
+        .catch(err => console.error('Event submission failed:', err));
 }
+
 
 
 // Fetch all events for the current user
@@ -120,15 +188,18 @@ function loadEvents() {
     formData.append('action', 'fetch');
     formData.append('csrf_token', document.getElementById('csrfToken').value);
 
-    fetch('php/event.php', { method: 'POST', body: formData })
+    fetch('./php/event.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(res => {
-        if (res.success) {
-            renderEvents(res.events);
-            loadSharedEvents(); 
-        } else alert(res.message);
-        });
+            if (res.success) {
+                renderEvents(res.events);
+            } else {
+                alert(res.message);
+            }
+        })
+        .catch(err => console.error('Error loading events:', err));
 }
+
 
 // Add new event
 function addEvent(title, date, time, description) {
@@ -140,7 +211,7 @@ function addEvent(title, date, time, description) {
     formData.append('description', description);
     formData.append('csrf_token', document.getElementById('csrfToken').value);
 
-    fetch('php/event.php', { method: 'POST', body: formData })
+    fetch('./php/event.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(res => {
         if (res.success) loadEvents();
@@ -159,7 +230,7 @@ function editEvent(id, title, date, time, description) {
     formData.append('description', description);
     formData.append('csrf_token', document.getElementById('csrfToken').value);
 
-    fetch('php/event.php', { method: 'POST', body: formData })
+    fetch('./php/event.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(res => {
         if (res.success) loadEvents();
@@ -174,7 +245,7 @@ function deleteEvent(id) {
     formData.append('event_id', id);
     formData.append('csrf_token', document.getElementById('csrfToken').value);
 
-    fetch('php/event.php', { method: 'POST', body: formData })
+    fetch('./php/event.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(res => {
         if (res.success) loadEvents();
@@ -200,8 +271,13 @@ function renderEvents(events) {
 
         const div = document.createElement('div');
         div.className = 'event';
-        div.textContent = ev.title;
-        div.style.backgroundColor = tag?.color || '#007bff';
+        if (ev.is_group === 1 || ev.group === true) {
+                div.textContent = `[Group] ${ev.title}`;
+                div.style.backgroundColor = '#f39c12';
+            } else {
+                div.textContent = ev.title;
+                div.style.backgroundColor = tag?.color || '#007bff';
+            }
         div.onclick = (event) => {
             event.stopPropagation();
             openEditModal(ev);
@@ -216,7 +292,7 @@ function loadTags() {
     formData.append('action', 'tags');
     formData.append('csrf_token', document.getElementById('csrfToken').value);
 
-    fetch('php/event.php', { method: 'POST', body: formData })
+    fetch('./php/event.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(res => {
         if (res.success) {
@@ -275,7 +351,7 @@ function shareCalendar() {
     formData.append('can_edit', canEdit);
     formData.append('csrf_token', document.getElementById('csrfToken').value);
 
-    fetch('php/event.php', { method: 'POST', body: formData })
+    fetch('./php/event.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(res => alert(res.message));
 }
@@ -287,7 +363,7 @@ function loadSharedEvents() {
     formData.append('action', 'shared_fetch');
     formData.append('csrf_token', document.getElementById('csrfToken').value);
 
-    fetch('php/event.php', { method: 'POST', body: formData })
+    fetch('./php/event.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(res => {
         if (res.success) renderSharedEvents(res.shared_events);
@@ -309,3 +385,6 @@ function renderSharedEvents(events) {
         }
     });
 }
+
+
+

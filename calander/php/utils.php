@@ -8,7 +8,6 @@ function get_csrf_token() {
     return $_SESSION['csrf_token'];
 }
 
-
 function verify_csrf_token($token) {
     return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
 }
@@ -60,59 +59,128 @@ function login_user($mysqli, $username, $password) {
 
 
 
-function add_event($mysqli, $user_id, $title, $event_date, $event_time, $description, $tag_id = null) {
-    $stmt = $mysqli->prepare(
-        "INSERT INTO events (user_id, title, event_date, event_time, description)
-         VALUES (?, ?, ?, ?, ?)"
-    );
-    $stmt->bind_param('issss', $user_id, $title, $event_date, $event_time, $description);
-    if ($stmt->execute()) {
-        $event_id = $stmt->insert_id;
-        $stmt->close();
+function add_event($mysqli, $user_id, $title, $date, $time, $desc, $tagId, $color) {
+    $stmt = $mysqli->prepare("
+        INSERT INTO events (user_id, title, event_date, event_time, description, color)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->bind_param("isssss", $user_id, $title, $date, $time, $desc, $color);
+    $stmt->execute();
 
-        if ($tag_id) add_tag_to_event($mysqli, $event_id, $tag_id);
-        return ["success" => true, "event_id" => $event_id];
+    if ($stmt->affected_rows > 0) {
+        return ["success" => true, "message" => "Event added"];
+    } else {
+        return ["success" => false, "message" => "Failed to add event: " . $stmt->error];
     }
-    $stmt->close();
-    return ["success" => false, "message" => "Failed to add event"];
 }
 
-function edit_event($mysqli, $user_id, $event_id, $title, $event_date, $event_time, $description) {
+
+function edit_event($mysqli, $user_id, $event_id, $title, $event_date, $event_time, $description, $color = '#007bff') { 
     $stmt = $mysqli->prepare(
         "UPDATE events
-         SET title=?, event_date=?, event_time=?, description=?
+         SET title=?, event_date=?, event_time=?, description=?, color=?
          WHERE event_id=? AND user_id=?"
     );
-    $stmt->bind_param('ssssii', $title, $event_date, $event_time, $description, $event_id, $user_id);
+    $stmt->bind_param('sssssii', $title, $event_date, $event_time, $description, $color, $event_id, $user_id);
     $success = $stmt->execute();
     $stmt->close();
 
     return $success
         ? ["success" => true]
-        : ["success" => false, "message" => "Update failed"];
+        : ["success" => false, "message" => "Update failed: " . $stmt->error];
 }
+
 
 function delete_event($mysqli, $user_id, $event_id) {
-    $stmt = $mysqli->prepare("DELETE FROM events WHERE event_id=? AND user_id=?");
-    $stmt->bind_param('ii', $event_id, $user_id);
-    $success = $stmt->execute();
-    $stmt->close();
+    $mysqli->begin_transaction();
+    try {
 
-    return $success
-        ? ["success" => true]
-        : ["success" => false, "message" => "Delete failed"];
+        $stmt = $mysqli->prepare("SELECT user_id FROM events WHERE event_id = ?");
+        $stmt->bind_param('i', $event_id);
+        $stmt->execute();
+        $stmt->bind_result($owner_id);
+        $stmt->fetch();
+        $stmt->close();
+
+        if (!$owner_id) {
+            throw new Exception("Event not found");
+        }
+
+        // if its owner, delete from events and related tables
+        if ($owner_id == $user_id) {
+            // remove from group
+            $stmt = $mysqli->prepare("DELETE FROM group_events WHERE event_id = ?");
+            $stmt->bind_param('i', $event_id);
+            $stmt->execute();
+            $stmt->close();
+
+            $stmt = $mysqli->prepare("DELETE FROM event_tag_map WHERE event_id = ?");
+            $stmt->bind_param('i', $event_id);
+            $stmt->execute();
+            $stmt->close();
+
+            // events delte
+            $stmt = $mysqli->prepare("DELETE FROM events WHERE event_id = ?");
+            $stmt->bind_param('i', $event_id);
+            $stmt->execute();
+            $stmt->close();
+        } 
+        else {
+            $stmt = $mysqli->prepare("DELETE FROM group_events WHERE event_id = ? AND participant_id = ?");
+            $stmt->bind_param('ii', $event_id, $user_id);
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        $mysqli->commit();
+        return ["success" => true, "message" => "Event deleted successfully."];
+    } catch (Exception $e) {
+        $mysqli->rollback();
+        return ["success" => false, "message" => "Error: ".$e->getMessage()];
+    }
 }
 
+
 function fetch_events($mysqli, $user_id) {
-    $stmt = $mysqli->prepare(
-        "SELECT e.event_id, e.title, e.event_date, e.event_time, e.description,
-                m.tag_id
+    $stmt = $mysqli->prepare("
+        SELECT 
+            e.event_id,
+            e.title,
+            e.event_date,
+            e.event_time,
+            e.description,
+            e.color,
+            MAX(m.tag_id) AS tag_id,
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1 
+                    FROM group_events ge 
+                    WHERE ge.event_id = e.event_id
+                ) THEN 1 
+                ELSE 0 
+            END AS is_group,
+            u.username
         FROM events e
         LEFT JOIN event_tag_map m ON m.event_id = e.event_id
-        WHERE e.user_id = ?
-        ORDER BY e.event_date, e.event_time"
-    );
-    $stmt->bind_param('i', $user_id);
+        LEFT JOIN users u ON e.user_id = u.user_id
+        WHERE 
+            (
+                e.user_id = ?
+                AND e.event_id NOT IN (
+                    SELECT event_id FROM group_events WHERE participant_id = ?
+                )
+            )
+            OR EXISTS (
+                SELECT 1 
+                FROM group_events ge2 
+                WHERE ge2.event_id = e.event_id 
+                AND ge2.participant_id = ?
+            )
+        GROUP BY e.event_id, e.title, e.event_date, e.event_time, e.description, u.username
+        ORDER BY e.event_date, e.event_time
+    ");
+
+    $stmt->bind_param('iii', $user_id, $user_id, $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -124,6 +192,8 @@ function fetch_events($mysqli, $user_id) {
 
     return ["success" => true, "events" => $events];
 }
+
+
 
 
 // tag functions
@@ -213,5 +283,65 @@ function fetch_shared_events($mysqli, $user_id) {
     return $events;
 }
 
+function add_group_event($mysqli, $creator_id, $title, $date, $time, $desc, $participants_csv, $color = '#f39c12') { 
+    $mysqli->begin_transaction();
+    try {
+        $stmt = $mysqli->prepare("
+            INSERT INTO events (user_id, title, event_date, event_time, description, color)
+            VALUES (?, ?, ?, ?, ?, ?)
+        "); 
+        $stmt->bind_param('isssss', $creator_id, $title, $date, $time, $desc, $color); 
+        $stmt->execute();
+        $event_id = $stmt->insert_id;
+        $stmt->close();
+
+        $participants = explode(',', $participants_csv);
+        $stmt_user = $mysqli->prepare("SELECT user_id FROM users WHERE username = ?");
+        $stmt_insert = $mysqli->prepare("INSERT INTO group_events (event_id, participant_id) VALUES (?, ?)");
+
+        foreach ($participants as $uname) {
+            $uname = trim($uname);
+            if ($uname === '') continue;
+
+            $stmt_user->bind_param('s', $uname);
+            $stmt_user->execute();
+            $res = $stmt_user->get_result();
+
+            if ($row = $res->fetch_assoc()) {
+                $participant_id = $row['user_id'];
+                $stmt_insert->bind_param('ii', $event_id, $participant_id);
+                $stmt_insert->execute();
+            } else {
+                error_log("Username not found: $uname");
+            }
+        }
+
+        $stmt_user->close();
+        $stmt_insert->close();
+        $mysqli->commit();
+
+        return ["success" => true, "message" => "Group event added for participants."];
+    } catch (Exception $e) {
+        $mysqli->rollback();
+        return ["success" => false, "message" => "Error: ".$e->getMessage()];
+    }
+}
+
+
+function fetch_group_events($mysqli, $user_id) {
+    $stmt = $mysqli->prepare("
+        SELECT e.*, u.username
+        FROM events e
+        JOIN group_events g ON e.event_id = g.event_id
+        JOIN users u ON e.user_id = u.user_id
+        WHERE g.participant_id = ?
+    ");
+    $stmt->bind_param('i', $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $events = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return ["success" => true, "events" => $events];
+}
 
 ?>

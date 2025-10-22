@@ -24,7 +24,7 @@
       form.append('email', e);
       form.append('password', p);
 
-      const r = await fetch('php/register.php', { method: 'POST', body: form });
+      const r = await fetch('./php/register.php', { method: 'POST', body: form });
       const data = await r.json();
       if (data.success) window.location.href = 'main.php';
       else document.getElementById('msg').textContent = data.message;
