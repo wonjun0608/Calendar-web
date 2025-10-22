@@ -104,12 +104,6 @@ switch ($action) {
     send_json($result);
     break;
 
-
-case 'group_fetch':
-    $result = fetch_group_events($mysqli, $_SESSION['user_id']);
-    send_json($result);
-    break;
-
     default:
         send_json(["success" => false, "message" => "Unknown action"]);
 }

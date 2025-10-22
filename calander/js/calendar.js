@@ -292,12 +292,12 @@ function renderEvents(events) {
         const div = document.createElement('div');
         div.className = 'event';
         if (ev.is_group === 1 || ev.group === true) {
-                div.textContent = `[Group] ${ev.title}`;
-                div.style.backgroundColor = '#f39c12';
-            } else {
-                div.textContent = ev.title;
-                div.style.backgroundColor = ev.color || tag?.color || '#007bff';
-            }
+            div.textContent = `[Group] ${ev.title}`;
+            div.style.backgroundColor = ev.color || '#007bff';  
+        } else {
+            div.textContent = ev.title;
+            div.style.backgroundColor = ev.color || tag?.color || '#007bff';
+        }
         div.onclick = (event) => {
             event.stopPropagation();
             openEditModal(ev);
