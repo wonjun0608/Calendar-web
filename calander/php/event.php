@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     send_json(["success" => false, "message" => "Invalid request"], 405);
 }
 
+
 $csrf = $_POST['csrf_token'] ?? '';
 if (!verify_csrf_token($csrf)) {
     send_json(["success" => false, "message" => "Invalid CSRF token"], 403);
@@ -46,11 +47,12 @@ switch ($action) {
         $date  = trim($_POST['event_date'] ?? '');
         $time  = trim($_POST['event_time'] ?? '');
         $desc  = trim($_POST['description'] ?? '');
-        $color = $_POST['color'] ?? '#007bff';  //
+        $color = $_POST['color'] ?? '#007bff';  
         if ($id === 0 || $title === '' || $date === '' || $time === '') {
             send_json(["success" => false, "message" => "Missing fields"]);
         }
-        $result = edit_event($mysqli, $_SESSION['user_id'], $id, $title, $date, $time, $desc, $color);
+        $tagId = isset($_POST['tag_id']) && $_POST['tag_id'] !== '' ? (int) $_POST['tag_id'] : 1;
+        $result = edit_event($mysqli, $_SESSION['user_id'], $id, $title, $date, $time, $desc, $color, $tagId);
         send_json($result);
         break;
 

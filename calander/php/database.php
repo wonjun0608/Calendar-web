@@ -4,6 +4,7 @@ $user = 'wustl_inst';
 $pass = 'wustl_pass';             
 $db   = 'calendar_db';                      
 
+
 $mysqli = new mysqli($host, $user, $pass, $db);
 
 // Check for connection error

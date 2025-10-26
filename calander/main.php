@@ -4,14 +4,15 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 session_start();
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.html");
-    exit();
-}
+// if (!isset($_SESSION['user_id'])) {
+//     header("Location: login.html");
+//     exit();
+// }
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
+
 ?>
 
 <!DOCTYPE html>
@@ -24,6 +25,19 @@ if (empty($_SESSION['csrf_token'])) {
     <link rel="stylesheet" href="css/color.css" />
 </head>
 <body>
+    <div class="auth-controls" style="text-align:right; margin:10px 20px;">
+        <?php if (isset($_SESSION['user_id'])): ?>
+            <span>Welcome, <b><?php echo htmlspecialchars($_SESSION['username']); ?></b></span>
+            <button id="logoutBtn" >
+                Logout
+            </button>
+            <?php else: ?>
+                <button 
+                id="loginBtn">
+                Login
+                </button>
+            <?php endif; ?>
+    </div>
     <h1 id="monthYear"></h1>
     <div class="calendar-controls">
         <button id="prevMonth">← Prev</button>
@@ -41,9 +55,13 @@ if (empty($_SESSION['csrf_token'])) {
         <tbody id="calendar-body"></tbody>
     </table>
 
-    <label for="eventTag">Tag:</label>
-    <select id="eventTag" name="tag_id">
-        <option value="">Select Tag</option>
+    <label for="filterTag"><b>Filter by Tag:</b></label>
+    <select id="filterTag" style="padding:6px; width:80%; text-align:center;">
+        <option value="all" selected>All</option>
+        <option value="1">Work</option>
+        <option value="2">Event</option>
+        <option value="3">Meeting</option>
+        <option value="4">Other</option>
     </select>
 
     <div id="eventModal" class="modal">
@@ -60,16 +78,24 @@ if (empty($_SESSION['csrf_token'])) {
         <input type="time" id="eventTime" name="event_time" required style="padding:6px; width:80%; text-align:center;" />
         <input type="text" id="eventTitle" name="title" placeholder="Event Title" required style="padding:6px; width:80%; text-align:center;" />
         <textarea id="eventDescription" name="description" placeholder="Description" style="padding:6px; width:80%; text-align:center; height:60px;"></textarea>
+
+        <label for="eventTag"><b>Tag:</b></label>
+        <select id="eventTag" name="tag_id" style="padding:6px; width:80%; text-align:center;">
+            <option value="1" selected>Work</option>
+            <option value="2">Event</option>
+            <option value="3">Meeting</option>
+            <option value="4">Other</option>
+        </select>
     
         <label for="eventColor"><b>Select Color:</b></label>
         <div id="colorPicker" class="color-picker">
-        <div class="color-option" style="background-color: #007bff;" data-color="#007bff"></div>
-        <div class="color-option" style="background-color: #28a745;" data-color="#28a745"></div>
-        <div class="color-option" style="background-color: #f39c12;" data-color="#f39c12"></div>
-        <div class="color-option" style="background-color: #dc3545;" data-color="#dc3545"></div>
-        <div class="color-option" style="background-color: #6f42c1;" data-color="#6f42c1"></div>
-          </div>
-<input type="hidden" name="color" id="eventColor" value="#007bff">
+            <div class="color-option" style="background-color: #007bff;" data-color="#007bff"></div>
+            <div class="color-option" style="background-color: #28a745;" data-color="#28a745"></div>
+            <div class="color-option" style="background-color: #f39c12;" data-color="#f39c12"></div>
+            <div class="color-option" style="background-color: #dc3545;" data-color="#dc3545"></div>
+            <div class="color-option" style="background-color: #6f42c1;" data-color="#6f42c1"></div>
+        </div>
+        <input type="hidden" name="color" id="eventColor" value="#007bff">
 
 
        
@@ -114,14 +140,39 @@ if (empty($_SESSION['csrf_token'])) {
 </div> 
 
 <script>
-  document.addEventListener('DOMContentLoaded', () => {                 
+  document.addEventListener('DOMContentLoaded', () => {        
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');         
     const mk = document.getElementById('makeGroup');                    
     const part = document.getElementById('participants');        
     if (mk && part) {                                                
       mk.addEventListener('change', () => {                            
         part.style.display = mk.checked ? 'block' : 'none';            
       });                                                               
-    }                                                                   
+    } 
+    
+    if (loginBtn) {
+        loginBtn.addEventListener('click', () => {
+        window.location.href = 'login.html';
+        });
+    }
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+        const form = new FormData();
+
+        form.append('action', 'logout');
+        form.append('csrf_token', '<?php echo $_SESSION['csrf_token']; ?>');
+        
+        const res = await fetch('php/logout.php', { method: 'POST', body: form });
+        const data = await res.json();
+        if (data.success) {
+            window.location.href = 'login.html';
+        } else {
+            alert(data.message || 'Logout failed');
+        }
+        });
+    }
   });                                                                   
 </script>
 

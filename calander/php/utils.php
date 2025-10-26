@@ -8,6 +8,7 @@ function get_csrf_token() {
     return $_SESSION['csrf_token'];
 }
 
+
 function verify_csrf_token($token) {
     return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
 }
@@ -59,12 +60,12 @@ function login_user($mysqli, $username, $password) {
 
 
 
-function add_event($mysqli, $user_id, $title, $date, $time, $desc, $tagId, $color) {
+function add_event($mysqli, $user_id, $title, $date, $time, $desc, $tagId = 1, $color = '#007bff') {
     $stmt = $mysqli->prepare("
-        INSERT INTO events (user_id, title, event_date, event_time, description, color)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO events (user_id, title, event_date, event_time, description, tag_id, color)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
-    $stmt->bind_param("isssss", $user_id, $title, $date, $time, $desc, $color);
+    $stmt->bind_param('issssis', $user_id, $title, $date, $time, $desc, $tagId, $color);
     $stmt->execute();
 
     if ($stmt->affected_rows > 0) {
@@ -75,13 +76,13 @@ function add_event($mysqli, $user_id, $title, $date, $time, $desc, $tagId, $colo
 }
 
 
-function edit_event($mysqli, $user_id, $event_id, $title, $event_date, $event_time, $description, $color = '#007bff') { 
+function edit_event($mysqli, $user_id, $event_id, $title, $event_date, $event_time, $description, $color = '#007bff', $tag_id = 1) {
     $stmt = $mysqli->prepare(
         "UPDATE events
-         SET title=?, event_date=?, event_time=?, description=?, color=?
+         SET title=?, event_date=?, event_time=?, description=?, color=?, tag_id=?
          WHERE event_id=? AND user_id=?"
     );
-    $stmt->bind_param('sssssii', $title, $event_date, $event_time, $description, $color, $event_id, $user_id);
+    $stmt->bind_param('sssssiii', $title, $event_date, $event_time, $description, $color, $tag_id, $event_id, $user_id);
     $success = $stmt->execute();
     $stmt->close();
 
@@ -114,11 +115,6 @@ function delete_event($mysqli, $user_id, $event_id) {
             $stmt->execute();
             $stmt->close();
 
-            $stmt = $mysqli->prepare("DELETE FROM event_tag_map WHERE event_id = ?");
-            $stmt->bind_param('i', $event_id);
-            $stmt->execute();
-            $stmt->close();
-
             // events delte
             $stmt = $mysqli->prepare("DELETE FROM events WHERE event_id = ?");
             $stmt->bind_param('i', $event_id);
@@ -142,7 +138,7 @@ function delete_event($mysqli, $user_id, $event_id) {
 
 
 function fetch_events($mysqli, $user_id) {
-    $stmt = $mysqli->prepare("
+ $stmt = $mysqli->prepare("
         SELECT 
             e.event_id,
             e.title,
@@ -150,7 +146,7 @@ function fetch_events($mysqli, $user_id) {
             e.event_time,
             e.description,
             e.color,
-            MAX(m.tag_id) AS tag_id,
+            e.tag_id,
             CASE 
                 WHEN EXISTS (
                     SELECT 1 
@@ -161,7 +157,6 @@ function fetch_events($mysqli, $user_id) {
             END AS is_group,
             u.username
         FROM events e
-        LEFT JOIN event_tag_map m ON m.event_id = e.event_id
         LEFT JOIN users u ON e.user_id = u.user_id
         WHERE 
             (
@@ -176,7 +171,6 @@ function fetch_events($mysqli, $user_id) {
                 WHERE ge2.event_id = e.event_id 
                 AND ge2.participant_id = ?
             )
-        GROUP BY e.event_id, e.title, e.event_date, e.event_time, e.description, u.username
         ORDER BY e.event_date, e.event_time
     ");
 

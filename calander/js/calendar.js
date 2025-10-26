@@ -1,11 +1,17 @@
 
 let currentDate = new Date();
 let isEditing = false;
-let tags = [];
-let activeTags = new Set();
+
+const tags = [
+  { tag_id: 1, tag_name: 'Work', color: '#007bff' },
+  { tag_id: 2, tag_name: 'Event', color: '#28a745' },
+  { tag_id: 3, tag_name: 'Meeting', color: '#f39c12' },
+  { tag_id: 4, tag_name: 'Other', color: '#6c757d' }
+];
+
+let activeTags = new Set(tags.map(t => t.tag_id));
 
 document.addEventListener('DOMContentLoaded', () => {
-    loadTags();
     renderCalendar();
     document.getElementById('prevMonth').onclick = () => changeMonth(-1);
     document.getElementById('nextMonth').onclick = () => changeMonth(1);
@@ -17,18 +23,35 @@ document.addEventListener('DOMContentLoaded', () => {
         opt.addEventListener('click', function() {
             const selectedColor = this.getAttribute('data-color');
             document.getElementById('eventColor').value = selectedColor;
-
-            
+        
             document.querySelectorAll('.color-option').forEach(o => o.style.outline = '');
             this.style.outline = '3px solid black';
         });
     });
+
+    const filterTag = document.getElementById('filterTag');
+    if (filterTag) {
+    filterTag.addEventListener('change', () => {
+        const selected = filterTag.value;
+        activeTags.clear();
+        if (selected === 'all') {
+            // Show all tags
+            tags.forEach(t => activeTags.add(t.tag_id));
+        } 
+        else {
+            // Show only the selected tag
+            activeTags.add(parseInt(selected));
+        }
+        renderCalendar();
+    });
+    }
 
     const delBtn = document.getElementById('deleteEventBtn');
     if (delBtn) {
         delBtn.addEventListener('click', () => {
             const eventId = document.getElementById('eventId').value;
             if (!eventId) return;
+
 
             const formData = new FormData();
             formData.append('action', 'delete');
@@ -72,12 +95,14 @@ function renderCalendar() {
             cell.onclick = () => openModal(year, month, date);
             cell.id = `day-${year}-${month + 1}-${date}`;
             date++;
+
         }
         row.appendChild(cell);
         }
         tbody.appendChild(row);
     }
-    loadEvents(year, month + 1);
+    loadEvents();
+    //loadSharedEvents();
 }
 
 function changeMonth(step) {
@@ -171,6 +196,7 @@ function submitEvent(e) {
     const formData = new FormData(form);
     formData.append('csrf_token', document.getElementById('csrfToken').value);
     formData.append('color', document.getElementById('eventColor').value);
+    formData.append('tag_id', document.getElementById('eventTag').value);
 
     const makeGroup = document.getElementById('makeGroup');
     const participants = document.getElementById('participants');
@@ -285,7 +311,7 @@ function renderEvents(events) {
 
         // Use tag_id if present; show event if no tag (don’t filter it out)
         const tagId = ev.tag_id ?? (ev.tags?.[0]?.tag_id ?? null);
-        if (tagId && !activeTags.has(String(tagId))) return;
+        if (tagId && !activeTags.has(tagId)) return;
 
         const tag = tagId ? tags.find(t => String(t.tag_id) === String(tagId)) : null;
 
@@ -307,56 +333,29 @@ function renderEvents(events) {
     });
 }
 
-function loadTags() {
-    const formData = new FormData();
-    formData.append('action', 'tags');
-    formData.append('csrf_token', document.getElementById('csrfToken').value);
-
-    fetch('./php/event.php', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(res => {
-        if (res.success) {
-            tags = res.tags;
-            populateTagDropdown();
-            renderTagFilters();
-        }
-        });
-}
-
-function populateTagDropdown() {
-    const select = document.getElementById('eventTag');
-    select.innerHTML = '<option value="">-- Select Tag --</option>';
-    tags.forEach(tag => {
-        const opt = document.createElement('option');
-        opt.value = tag.tag_id;
-        opt.textContent = tag.tag_name;
-        opt.style.color = tag.color;
-        select.appendChild(opt);
-    });
-}
-
 function renderTagFilters() {
-    const container = document.getElementById('tagFilters');
-    container.innerHTML = '';
-    tags.forEach(tag => {
-        const label = document.createElement('label');
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.value = tag.tag_id;
-        checkbox.checked = true;
-        activeTags.add(tag.tag_id);
+  const container = document.getElementById('tagFilters');
+  container.innerHTML = '';
+  tags.forEach(tag => {
+    const label = document.createElement('label');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = tag.tag_id;
+    checkbox.checked = true;
+    activeTags.add(tag.tag_id);
 
-        checkbox.onchange = () => {
-        if (checkbox.checked) activeTags.add(tag.tag_id);
-        else activeTags.delete(tag.tag_id);
-        renderCalendar();
-        };
+    checkbox.onchange = () => {
+      if (checkbox.checked) activeTags.add(tag.tag_id);
+      else activeTags.delete(tag.tag_id);
+      renderCalendar();
+    };
 
-        label.appendChild(checkbox);
-        label.append(` ${tag.tag_name}`);
-        label.style.color = tag.color;
-        container.appendChild(label);
-    });
+    label.appendChild(checkbox);
+    label.append(` ${tag.tag_name}`);
+    label.style.color = tag.color;
+    label.style.marginRight = '10px';
+    container.appendChild(label);
+  });
 }
 
 
