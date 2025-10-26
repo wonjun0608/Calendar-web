@@ -2,6 +2,7 @@
 
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
+ini_set("session.cookie_httponly", 1); //HTTP-Only Cookies
 session_start();
 
 // if (!isset($_SESSION['user_id'])) {
@@ -18,11 +19,11 @@ if (empty($_SESSION['csrf_token'])) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Calendar App</title>
-    <link rel="stylesheet" href="css/style.css" />
-    <link rel="stylesheet" href="css/color.css" />
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/color.css">
 </head>
 <body>
     <div class="auth-controls" style="text-align:right; margin:10px 20px;">
@@ -38,7 +39,7 @@ if (empty($_SESSION['csrf_token'])) {
                 </button>
             <?php endif; ?>
     </div>
-    <h1 id="monthYear"></h1>
+    <h1 id="monthYear">Loading...</h1>
     <div class="calendar-controls">
         <button id="prevMonth">← Prev</button>
         <button id="nextMonth">Next →</button>
@@ -55,39 +56,41 @@ if (empty($_SESSION['csrf_token'])) {
         <tbody id="calendar-body"></tbody>
     </table>
 
-    <label for="filterTag"><b>Filter by Tag:</b></label>
-    <select id="filterTag" style="padding:6px; width:80%; text-align:center;">
-        <option value="all" selected>All</option>
-        <option value="1">Work</option>
-        <option value="2">Event</option>
-        <option value="3">Meeting</option>
-        <option value="4">Other</option>
-    </select>
-
+    <div style="margin-top: 15px; text-align: center;">
+  <label for="filterTag" style="font-weight: bold; margin-right: 8px;">Filter by Tag:</label>
+  <select id="filterTag" style="padding:6px; width:200px; text-align:center; border-radius:6px;">
+      <option value="all" selected>All</option>
+      <option value="1">Work</option>
+      <option value="2">Event</option>
+      <option value="3">Meeting</option>
+      <option value="4">Other</option>
+  </select>
+</div>
+    <!-- Popup form for adding or editing events -->
     <div id="eventModal" class="modal">
         <div class="modal-content">
             <span id="closeModal">&times;</span>
             <h2 id="modalTitle">Add Event</h2>
             <form id="eventForm" style="text-align: center;">
-                <input type="hidden" name="action" value="add" />
-                <input type="hidden" id="eventId" name="event_id" />
+                <input type="hidden" name="action" value="add">
+                <input type="hidden" id="eventId" name="event_id">
                 <input type="hidden" id="csrfToken" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
 
                 <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 15px;">
-        <input type="date" id="eventDate" name="event_date" required style="padding:6px; width:80%; text-align:center;" />
-        <input type="time" id="eventTime" name="event_time" required style="padding:6px; width:80%; text-align:center;" />
-        <input type="text" id="eventTitle" name="title" placeholder="Event Title" required style="padding:6px; width:80%; text-align:center;" />
+        <input type="date" id="eventDate" name="event_date" required style="padding:6px; width:80%; text-align:center;">
+        <input type="time" id="eventTime" name="event_time" required style="padding:6px; width:80%; text-align:center;">
+        <input type="text" id="eventTitle" name="title" placeholder="Event Title" required style="padding:6px; width:80%; text-align:center;">
         <textarea id="eventDescription" name="description" placeholder="Description" style="padding:6px; width:80%; text-align:center; height:60px;"></textarea>
-
+        <!-- Tag and color choices -->
         <label for="eventTag"><b>Tag:</b></label>
-        <select id="eventTag" name="tag_id" style="padding:6px; width:80%; text-align:center;">
+        <select id="eventTag" name="tag_id" style="padding:6px; width:200px; text-align:center;">  
             <option value="1" selected>Work</option>
             <option value="2">Event</option>
             <option value="3">Meeting</option>
             <option value="4">Other</option>
         </select>
     
-        <label for="eventColor"><b>Select Color:</b></label>
+        <label><b>Select Color:</b></label>
         <div id="colorPicker" class="color-picker">
             <div class="color-option" style="background-color: #007bff;" data-color="#007bff"></div>
             <div class="color-option" style="background-color: #28a745;" data-color="#28a745"></div>
@@ -96,21 +99,22 @@ if (empty($_SESSION['csrf_token'])) {
             <div class="color-option" style="background-color: #6f42c1;" data-color="#6f42c1"></div>
         </div>
         <input type="hidden" name="color" id="eventColor" value="#007bff">
+            </div>
 
 
        
          <div id="shareSection">
         <h3>Share Calendar</h3>
-        <input type="text" id="shareUsername" placeholder="Enter username" />
+        <input type="text" id="shareUsername" placeholder="Enter username">
         <label>
-            <input type="checkbox" id="canEdit" /> Allow editing
+            <input type="checkbox" id="canEdit"> Allow editing
         </label>
         <button id="shareBtn">Share</button>
     </div>
 
      <div style="text-align: center; margin-top: 10px;">
         <label>
-            <input type="checkbox" id="makeGroup" /> Save as Group Event
+            <input type="checkbox" id="makeGroup"> Save as Group Event
         </label>
         <br>
         <input 
@@ -118,8 +122,7 @@ if (empty($_SESSION['csrf_token'])) {
             id="participants" 
             name="participants" 
             placeholder="Enter username for group(comma-separated)" 
-            style="display: none; margin-top: 5px; text-align: center; width: 80%;"
-        />
+            style="display: none; margin-top: 5px; text-align: center; width: 80%;">
         </div>
 
     <button 
@@ -138,13 +141,14 @@ if (empty($_SESSION['csrf_token'])) {
 
 </div> 
 </div> 
-
+<!-- JS: handles login, logout, and form events -->
 <script>
   document.addEventListener('DOMContentLoaded', () => {        
     const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');         
     const mk = document.getElementById('makeGroup');                    
-    const part = document.getElementById('participants');        
+    const part = document.getElementById('participants'); 
+    // Show or hide participants field       
     if (mk && part) {                                                
       mk.addEventListener('change', () => {                            
         part.style.display = mk.checked ? 'block' : 'none';            
@@ -180,4 +184,5 @@ if (empty($_SESSION['csrf_token'])) {
 <script src="js/calendar.js"></script>
 </body>
 </html>
+
 

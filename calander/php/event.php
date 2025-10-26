@@ -1,6 +1,7 @@
 <?php
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
+ini_set("session.cookie_httponly", 1); // HTTP-Only Cookies
 session_start();
 require_once 'utils.php';
 
@@ -30,7 +31,7 @@ switch ($action) {
         $date  = trim($_POST['event_date'] ?? '');
         $time  = trim($_POST['event_time'] ?? '');
         $desc  = trim($_POST['description'] ?? '');
-        $tagId = isset($_POST['tag_id']) && $_POST['tag_id'] !== '' ? (int) $_POST['tag_id'] : null;
+        $tagId = isset($_POST['tag_id']) && $_POST['tag_id'] !== '' ? (int) $_POST['tag_id'] : 1;
         $color = $_POST['color'] ?? '#007bff';
 
         if ($title === '' || $date === '' || $time === '') {
@@ -97,12 +98,13 @@ switch ($action) {
     $desc = trim($_POST['description'] ?? '');
     $participants = $_POST['participants'] ?? '';
     $color = $_POST['color'] ?? '#007bff'; 
+    $tag_id = isset($_POST['tag_id']) ? (int) $_POST['tag_id'] : 1; 
 
     if ($title === '' || $date === '' || $time === '' || $participants === '') {
         send_json(["success" => false, "message" => "Missing fields"]);
     }
 
-    $result = add_group_event($mysqli, $_SESSION['user_id'], $title, $date, $time, $desc, $participants, $color);
+    $result = add_group_event($mysqli, $_SESSION['user_id'], $title, $date, $time, $desc, $participants, $color, $tag_id);
     send_json($result);
     break;
 

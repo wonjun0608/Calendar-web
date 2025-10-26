@@ -20,6 +20,7 @@ function send_json($data, $status = 200) {
     exit;
 }
 
+// register new user
 function register_user($mysqli, $username, $email, $password) {
     $stmt = $mysqli->prepare("SELECT user_id FROM users WHERE username = ?");
     $stmt->bind_param('s', $username);
@@ -43,7 +44,7 @@ function register_user($mysqli, $username, $email, $password) {
     $stmt->close();
     return ["success" => false, "message" => "Registration failed"];
 }
-
+// login user
 function login_user($mysqli, $username, $password) {
     $stmt = $mysqli->prepare("SELECT user_id, password_hash FROM users WHERE username = ?");
     $stmt->bind_param('s', $username);
@@ -59,7 +60,7 @@ function login_user($mysqli, $username, $password) {
 }
 
 
-
+// add new event
 function add_event($mysqli, $user_id, $title, $date, $time, $desc, $tagId = 1, $color = '#007bff') {
     $stmt = $mysqli->prepare("
         INSERT INTO events (user_id, title, event_date, event_time, description, tag_id, color)
@@ -75,7 +76,7 @@ function add_event($mysqli, $user_id, $title, $date, $time, $desc, $tagId = 1, $
     }
 }
 
-
+// edit event info
 function edit_event($mysqli, $user_id, $event_id, $title, $event_date, $event_time, $description, $color = '#007bff', $tag_id = 1) {
     $stmt = $mysqli->prepare(
         "UPDATE events
@@ -91,11 +92,11 @@ function edit_event($mysqli, $user_id, $event_id, $title, $event_date, $event_ti
         : ["success" => false, "message" => "Update failed: " . $stmt->error];
 }
 
-
+//delte event
 function delete_event($mysqli, $user_id, $event_id) {
     $mysqli->begin_transaction();
     try {
-
+        //check event owner first 
         $stmt = $mysqli->prepare("SELECT user_id FROM events WHERE event_id = ?");
         $stmt->bind_param('i', $event_id);
         $stmt->execute();
@@ -122,6 +123,7 @@ function delete_event($mysqli, $user_id, $event_id) {
             $stmt->close();
         } 
         else {
+             // if participant, only delete from group events.
             $stmt = $mysqli->prepare("DELETE FROM group_events WHERE event_id = ? AND participant_id = ?");
             $stmt->bind_param('ii', $event_id, $user_id);
             $stmt->execute();
@@ -136,7 +138,7 @@ function delete_event($mysqli, $user_id, $event_id) {
     }
 }
 
-
+// get events for user
 function fetch_events($mysqli, $user_id) {
  $stmt = $mysqli->prepare("
         SELECT 
@@ -188,11 +190,9 @@ function fetch_events($mysqli, $user_id) {
 }
 
 
-
-
 // tag functions
 function fetch_tags($mysqli) {
-    $result = $mysqli->query("SELECT tag_id, tag_name, color FROM event_tags ORDER BY tag_name ASC");
+    $result = $mysqli->query("SELECT tag_id, tag_name, color FROM event_tags ORDER BY tag_id ASC");
     $tags = [];
     while ($row = $result->fetch_assoc()) {
         $tags[] = $row;
@@ -276,19 +276,21 @@ function fetch_shared_events($mysqli, $user_id) {
     $stmt->close();
     return $events;
 }
-
-function add_group_event($mysqli, $creator_id, $title, $date, $time, $desc, $participants_csv, $color = '#f39c12') { 
+// make group event
+function add_group_event($mysqli, $creator_id, $title, $date, $time, $desc, $participants_csv, $color, $tag_id = 1) { 
     $mysqli->begin_transaction();
     try {
+        // save creator event
         $stmt = $mysqli->prepare("
-            INSERT INTO events (user_id, title, event_date, event_time, description, color)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO events (user_id, title, event_date, event_time, description, color, tag_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         "); 
-        $stmt->bind_param('isssss', $creator_id, $title, $date, $time, $desc, $color); 
+        $stmt->bind_param('isssssi', $creator_id, $title, $date, $time, $desc, $color, $tag_id); 
         $stmt->execute();
         $event_id = $stmt->insert_id;
         $stmt->close();
 
+        // save participants
         $participants = explode(',', $participants_csv);
         $stmt_user = $mysqli->prepare("SELECT user_id FROM users WHERE username = ?");
         $stmt_insert = $mysqli->prepare("INSERT INTO group_events (event_id, participant_id) VALUES (?, ?)");
@@ -314,12 +316,13 @@ function add_group_event($mysqli, $creator_id, $title, $date, $time, $desc, $par
         $stmt_insert->close();
         $mysqli->commit();
 
-        return ["success" => true, "message" => "Group event added for participants."];
+        return ["success" => true, "message" => "Group event added with correct tag and color."];
     } catch (Exception $e) {
         $mysqli->rollback();
         return ["success" => false, "message" => "Error: ".$e->getMessage()];
     }
 }
+
 
 
 function fetch_group_events($mysqli, $user_id) {

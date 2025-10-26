@@ -12,7 +12,11 @@ const tags = [
 let activeTags = new Set(tags.map(t => t.tag_id));
 
 document.addEventListener('DOMContentLoaded', () => {
-    renderCalendar();
+    renderCalendar(); /* Make the initial monthly calendar */
+    renderTagFilters();  /* Show tag filter checkboxes */
+    loadSharedEvents();  /*  Load shared events when page opens */
+
+    /*  Buttons for month navigation */
     document.getElementById('prevMonth').onclick = () => changeMonth(-1);
     document.getElementById('nextMonth').onclick = () => changeMonth(1);
     document.getElementById('closeModal').onclick = closeModal;
@@ -71,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-
+/* Create and display the calendar grid for the current month */
 function renderCalendar() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -159,7 +163,7 @@ function openEditModal(ev) {
     document.getElementById('eventTime').value = ev.event_time;
     document.getElementById('eventTitle').value = ev.title;
     document.getElementById('eventDescription').value = ev.description;
-    if (ev.color) {
+    if (ev.color) {  /* Highlight the color used for this event */
     document.getElementById('eventColor').value = ev.color;
 
    
@@ -299,7 +303,7 @@ function deleteEvent(id) {
         });
 }
 
-
+/* Display all events inside the correct day cell */
 function renderEvents(events) {
     document.querySelectorAll('.event').forEach(e => e.remove());
 
@@ -358,12 +362,12 @@ function renderTagFilters() {
   });
 }
 
-
+// share your calendar with another user
 function shareCalendar() {
     const username = document.getElementById('shareUsername').value.trim();
     const canEdit = document.getElementById('canEdit').checked ? 1 : 0;
     if (!username) return alert('Enter a username');
-
+    // make data to send to server
     const formData = new FormData();
     formData.append('action', 'share');
     formData.append('username', username);
@@ -376,7 +380,7 @@ function shareCalendar() {
 }
 
 
-
+// load events that other users shared with me
 function loadSharedEvents() {
     const formData = new FormData();
     formData.append('action', 'shared_fetch');
@@ -388,7 +392,7 @@ function loadSharedEvents() {
         if (res.success) renderSharedEvents(res.shared_events);
         });
 }
-
+// show shared events on my calendar
 function renderSharedEvents(events) {
     events.forEach(ev => {
         const [y, m, d] = ev.event_date.split('-').map(Number);
