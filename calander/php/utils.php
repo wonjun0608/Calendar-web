@@ -258,24 +258,50 @@ function share_calendar($mysqli, $owner_id, $shared_with_username, $can_edit = f
         : ["success" => false, "message" => "Failed to share calendar"];
 }
 
-function fetch_shared_events($mysqli, $user_id) {
-    $stmt = $mysqli->prepare("
-        SELECT e.*, u.username
+function fetch_shared_events($mysqli, $user_id, $owner_ids = []) {
+    $query = "
+        SELECT 
+            e.event_id,
+            e.title,
+            e.event_date,
+            e.event_time,
+            e.description,
+            e.color,
+            e.tag_id,
+            u.username,
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1 FROM group_events ge WHERE ge.event_id = e.event_id
+                ) THEN 1
+                ELSE 0
+            END AS is_group
         FROM events e
         JOIN shared_calendars s ON e.user_id = s.owner_id
         JOIN users u ON s.owner_id = u.user_id
         WHERE s.shared_with_id = ?
-    ");
-    $stmt->bind_param('i', $user_id);
+    ";
+
+    if (!empty($owner_ids)) {
+        $placeholders = implode(',', array_fill(0, count($owner_ids), '?'));
+        $query .= " AND s.owner_id IN ($placeholders)";
+    }
+
+    $stmt = $mysqli->prepare($query);
+    $types = str_repeat('i', 1 + count($owner_ids));
+    $params = array_merge([$user_id], $owner_ids);
+    $stmt->bind_param($types, ...$params);
     $stmt->execute();
     $result = $stmt->get_result();
+
     $events = [];
     while ($row = $result->fetch_assoc()) {
         $events[] = $row;
     }
     $stmt->close();
+
     return $events;
 }
+
 // make group event
 function add_group_event($mysqli, $creator_id, $title, $date, $time, $desc, $participants_csv, $color, $tag_id = 1) { 
     $mysqli->begin_transaction();
@@ -339,6 +365,53 @@ function fetch_group_events($mysqli, $user_id) {
     $events = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
     return ["success" => true, "events" => $events];
+}
+
+function fetch_shared_owners($mysqli, $user_id) {
+    $stmt = $mysqli->prepare("
+        SELECT u.user_id, u.username, s.can_edit
+        FROM shared_calendars s
+        JOIN users u ON s.owner_id = u.user_id
+        WHERE s.shared_with_id = ?
+    ");
+    $stmt->bind_param('i', $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $owners = [];
+    while ($row = $result->fetch_assoc()) {
+        $owners[] = $row;
+    }
+    $stmt->close();
+    return $owners;
+}
+
+
+function fetch_shared_with_others($mysqli, $owner_id) {
+    $stmt = $mysqli->prepare("
+        SELECT u.user_id, u.username, s.can_edit
+        FROM shared_calendars s
+        JOIN users u ON s.shared_with_id = u.user_id
+        WHERE s.owner_id = ?
+    ");
+    $stmt->bind_param('i', $owner_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $users = [];
+    while ($row = $result->fetch_assoc()) {
+        $users[] = $row;
+    }
+    $stmt->close();
+    return $users;
+}
+
+function unshare_calendar($mysqli, $owner_id, $target_user_id) {
+    $stmt = $mysqli->prepare("DELETE FROM shared_calendars WHERE owner_id = ? AND shared_with_id = ?");
+    $stmt->bind_param('ii', $owner_id, $target_user_id);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
 }
 
 ?>

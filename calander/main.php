@@ -26,46 +26,64 @@ if (empty($_SESSION['csrf_token'])) {
     <link rel="stylesheet" href="css/color.css">
 </head>
 <body>
-    <div class="auth-controls" style="text-align:right; margin:10px 20px;">
-        <?php if (isset($_SESSION['user_id'])): ?>
-            <span>Welcome, <b><?php echo htmlspecialchars($_SESSION['username']); ?></b></span>
-            <button id="logoutBtn" >
-                Logout
+    <div id="mainContainer" style="display:flex; gap:20px; align-items:flex-start;">
+
+    <div id="leftSidebar" 
+        style="width:260px; background:#f8f9fa; padding:15px; border-radius:8px; box-shadow:0 0 6px rgba(0,0,0,0.1);">
+
+        <!-- Shared Calendars -->
+        <div id="sharedSidebar" style="margin-bottom:25px;">
+            <h3 style="margin-top:0;">Shared Calendars</h3>
+            <div id="sharedList" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+
+        
+
+        <!-- Share Calendar -->
+        <div id="shareSection" style="margin-bottom:25px;">
+            <h3>Share Calendar</h3>
+            <input type="text" id="shareUsername" placeholder="Enter username" style="width:100%; padding:6px;">
+            <button id="shareBtn" 
+                    style="margin-top:8px; padding:6px 10px; width:100%; background:#007bff; color:white; border:none; border-radius:5px; cursor:pointer;">
+                Share
             </button>
+        </div>
+
+
+    </div>
+
+    <div id="calendarMain" style="flex:1;">
+        <div class="auth-controls" style="text-align:right; margin:10px 20px;">
+            <?php if (isset($_SESSION['user_id'])): ?>
+                <span>Welcome, <b><?php echo htmlspecialchars($_SESSION['username']); ?></b></span>
+                <button id="logoutBtn">Logout</button>
             <?php else: ?>
-                <button 
-                id="loginBtn">
-                Login
-                </button>
+                <button id="loginBtn">Login</button>
             <?php endif; ?>
+        </div>
+
+        <h1 id="monthYear">Loading...</h1>
+        <div class="calendar-controls">
+            <button id="prevMonth">← Prev</button>
+            <button id="nextMonth">Next →</button>
+        </div>
+
+        <div id="tagFilters" class="tag-filters"></div>
+
+        <table id="calendar">
+            <thead>
+                <tr>
+                    <th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th>
+                    <th>Thu</th><th>Fri</th><th>Sat</th>
+                </tr>
+            </thead>
+            <tbody id="calendar-body"></tbody>
+        </table>
     </div>
-    <h1 id="monthYear">Loading...</h1>
-    <div class="calendar-controls">
-        <button id="prevMonth">← Prev</button>
-        <button id="nextMonth">Next →</button>
     </div>
 
-    <div id="tagFilters" class="tag-filters"></div>
 
-    <table id="calendar">
-        <thead>
-            <tr>
-            <th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th>
-            </tr>
-        </thead>
-        <tbody id="calendar-body"></tbody>
-    </table>
 
-    <div style="margin-top: 15px; text-align: center;">
-  <label for="filterTag" style="font-weight: bold; margin-right: 8px;">Filter by Tag:</label>
-  <select id="filterTag" style="padding:6px; width:200px; text-align:center; border-radius:6px;">
-      <option value="all" selected>All</option>
-      <option value="1">Work</option>
-      <option value="2">Event</option>
-      <option value="3">Meeting</option>
-      <option value="4">Other</option>
-  </select>
-</div>
     <!-- Popup form for adding or editing events -->
     <div id="eventModal" class="modal">
         <div class="modal-content">
@@ -81,6 +99,7 @@ if (empty($_SESSION['csrf_token'])) {
         <input type="time" id="eventTime" name="event_time" required style="padding:6px; width:80%; text-align:center;">
         <input type="text" id="eventTitle" name="title" placeholder="Event Title" required style="padding:6px; width:80%; text-align:center;">
         <textarea id="eventDescription" name="description" placeholder="Description" style="padding:6px; width:80%; text-align:center; height:60px;"></textarea>
+        
         <!-- Tag and color choices -->
         <label for="eventTag"><b>Tag:</b></label>
         <select id="eventTag" name="tag_id" style="padding:6px; width:200px; text-align:center;">  
@@ -99,18 +118,6 @@ if (empty($_SESSION['csrf_token'])) {
             <div class="color-option" style="background-color: #6f42c1;" data-color="#6f42c1"></div>
         </div>
         <input type="hidden" name="color" id="eventColor" value="#007bff">
-            </div>
-
-
-       
-         <div id="shareSection">
-        <h3>Share Calendar</h3>
-        <input type="text" id="shareUsername" placeholder="Enter username">
-        <label>
-            <input type="checkbox" id="canEdit"> Allow editing
-        </label>
-        <button id="shareBtn">Share</button>
-    </div>
 
      <div style="text-align: center; margin-top: 10px;">
         <label>
@@ -131,7 +138,7 @@ if (empty($_SESSION['csrf_token'])) {
         Save
     </button>
 
-          <button 
+    <button 
         type="button" 
         id="deleteEventBtn"
         style="margin-top:10px; padding:6px 20px; background:#dc3545; color:white; border:none; border-radius:6px; cursor:pointer; display:none;">
@@ -160,6 +167,7 @@ if (empty($_SESSION['csrf_token'])) {
         window.location.href = 'login.html';
         });
     }
+
 
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {

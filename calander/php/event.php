@@ -87,26 +87,48 @@ switch ($action) {
         break;
 
     case 'shared_fetch':
-        $shared_events = fetch_shared_events($mysqli, $_SESSION['user_id']);
+        $owners = isset($_POST['owners']) ? $_POST['owners'] : '';
+        $owner_ids = array_filter(array_map('intval', explode(',', $owners)));
+
+        $shared_events = fetch_shared_events($mysqli, $_SESSION['user_id'], $owner_ids);
         send_json(["success" => true, "shared_events" => $shared_events]);
+        break;
+
+    case 'shared_list':
+        $owners = fetch_shared_owners($mysqli, $_SESSION['user_id']);
+        send_json(["success" => true, "owners" => $owners]);
         break;
     
     case 'group_add':
-    $title = trim($_POST['title'] ?? '');
-    $date = trim($_POST['event_date'] ?? '');
-    $time = trim($_POST['event_time'] ?? '');
-    $desc = trim($_POST['description'] ?? '');
-    $participants = $_POST['participants'] ?? '';
-    $color = $_POST['color'] ?? '#007bff'; 
-    $tag_id = isset($_POST['tag_id']) ? (int) $_POST['tag_id'] : 1; 
+        $title = trim($_POST['title'] ?? '');
+        $date = trim($_POST['event_date'] ?? '');
+        $time = trim($_POST['event_time'] ?? '');
+        $desc = trim($_POST['description'] ?? '');
+        $participants = $_POST['participants'] ?? '';
+        $color = $_POST['color'] ?? '#007bff'; 
+        $tag_id = isset($_POST['tag_id']) ? (int) $_POST['tag_id'] : 1; 
 
-    if ($title === '' || $date === '' || $time === '' || $participants === '') {
-        send_json(["success" => false, "message" => "Missing fields"]);
-    }
+        if ($title === '' || $date === '' || $time === '' || $participants === '') {
+            send_json(["success" => false, "message" => "Missing fields"]);
+        }
 
-    $result = add_group_event($mysqli, $_SESSION['user_id'], $title, $date, $time, $desc, $participants, $color, $tag_id);
-    send_json($result);
-    break;
+        $result = add_group_event($mysqli, $_SESSION['user_id'], $title, $date, $time, $desc, $participants, $color, $tag_id);
+        send_json($result);
+        break;
+    
+    case 'shared_with_others':
+        $shared_users = fetch_shared_with_others($mysqli, $_SESSION['user_id']);
+        send_json(["success" => true, "shared_users" => $shared_users]);
+        break;
+
+    case 'unshare':
+        $target_user = intval($_POST['target_user_id']);
+        $ok = unshare_calendar($mysqli, $_SESSION['user_id'], $target_user);
+        send_json([
+            "success" => $ok,
+            "message" => $ok ? "Calendar unshared successfully." : "Failed to unshare."
+        ]);
+        break;
 
     default:
         send_json(["success" => false, "message" => "Unknown action"]);

@@ -7,8 +7,6 @@ ini_set("session.cookie_httponly", 1);
 session_start();
 require_once __DIR__ . '/utils.php';
 
-
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     send_json(["success" => false, "message" => "Invalid request"], 405);
 }

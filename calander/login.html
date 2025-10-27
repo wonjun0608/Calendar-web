@@ -14,6 +14,11 @@
   <p id="msg" style="color:red;"></p>
 
 
+  <button id="guestBtn" style="margin-top:15px; padding:8px 12px;  color:black; border:none; border-radius:5px; cursor:pointer;">
+    Continue without login
+  </button>
+
+
   
   <script>
     document.getElementById('loginBtn').onclick = async () => {
@@ -27,6 +32,10 @@
       const data = await r.json();
       if (data.success) window.location.href = 'main.php';
       else document.getElementById('msg').textContent = data.message;
+    };
+
+    document.getElementById('guestBtn').onclick = () => {
+      window.location.href = 'main.php';
     };
   </script>
 </body>

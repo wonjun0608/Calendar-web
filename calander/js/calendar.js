@@ -10,11 +10,15 @@ const tags = [
 ];
 
 let activeTags = new Set(tags.map(t => t.tag_id));
+const selectedOwners = new Set();
+
 
 document.addEventListener('DOMContentLoaded', () => {
     renderCalendar(); /* Make the initial monthly calendar */
     renderTagFilters();  /* Show tag filter checkboxes */
     loadSharedEvents();  /*  Load shared events when page opens */
+    loadSharedList();
+    loadSharedWithOthers();    
 
     /*  Buttons for month navigation */
     document.getElementById('prevMonth').onclick = () => changeMonth(-1);
@@ -84,8 +88,17 @@ function renderCalendar() {
     const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
     document.getElementById('monthYear').textContent = `${monthNames[month]} ${year}`;
 
+    if (selectedOwners.size > 0) {
+        const ownerId = [...selectedOwners][0];
+        const activeLabel = document.querySelector(`#sharedList input[value="${ownerId}"]`)?.nextSibling?.textContent?.trim();
+        if (activeLabel) {
+            document.getElementById('monthYear').textContent = `${activeLabel}'s Calendar — ${monthNames[month]} ${year}`;
+        }
+    }
+
     const tbody = document.getElementById('calendar-body');
     tbody.innerHTML = '';
+    document.querySelectorAll('.event').forEach(e => e.remove());
     let date = 1;
 
     for (let i = 0; i < 6; i++) {
@@ -95,8 +108,12 @@ function renderCalendar() {
         if (i === 0 && j < firstDay || date > daysInMonth) {
             cell.textContent = '';
         } else {
-            cell.textContent = date;
-            cell.onclick = () => openModal(year, month, date);
+            const dayForCell = date;
+            cell.textContent = dayForCell;
+            cell.onclick = () => {
+                console.log("Clicked:", year, month + 1, dayForCell);
+                openModal(year, month, dayForCell);
+            };
             cell.id = `day-${year}-${month + 1}-${date}`;
             date++;
 
@@ -105,8 +122,14 @@ function renderCalendar() {
         }
         tbody.appendChild(row);
     }
-    loadEvents();
-    //loadSharedEvents();
+    // Only one calendar active at a time
+    if (selectedOwners.size === 0) {
+        // show my calendar
+        loadEvents(); 
+    } else {
+        // show selected shared calendar
+        loadSharedEvents(); 
+    }
 }
 
 function changeMonth(step) {
@@ -133,13 +156,18 @@ function openModal(year, month, day) {
         participants.style.display = 'none';      
     }                                                           
 
+    // Ensure valid date even if day exceeds month length
     const correctedMonth = month + 1;
     const maxDay = new Date(year, correctedMonth, 0).getDate();
     const correctedDay = Math.min(day, maxDay);
+    const selectedDate = `${year}-${String(correctedMonth).padStart(2, '0')}-${String(correctedDay).padStart(2, '0')}`;
+    document.getElementById('eventDate').value = selectedDate;
 
+    const now = new Date();
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    document.getElementById('eventTime').value = currentTime;
     
-    document.getElementById('eventDate').value =
-        `${year}-${String(correctedMonth).padStart(2, '0')}-${String(correctedDay).padStart(2, '0')}`;
+    //document.getElementById('eventDate').value =`${year}-${String(correctedMonth).padStart(2, '0')}-${String(correctedDay).padStart(2, '0')}`;
 
     modal.style.display = 'block';
 
@@ -382,31 +410,170 @@ function shareCalendar() {
 
 // load events that other users shared with me
 function loadSharedEvents() {
+    if (selectedOwners.size === 0) return; // nothing selected
+
     const formData = new FormData();
     formData.append('action', 'shared_fetch');
+    formData.append('csrf_token', document.getElementById('csrfToken').value);
+    formData.append('owners', Array.from(selectedOwners).join(',')); // send chosen owners
+
+    fetch('./php/event.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) renderSharedEvents(res.shared_events);
+        })
+        .catch(err => console.error('Error loading shared events:', err));
+}
+
+// show shared events on my calendar
+function renderSharedEvents(events) {
+    document.querySelectorAll('.event').forEach(e => e.remove()); // clear before render
+
+    events.forEach(ev => {
+        const [y, m, d] = ev.event_date.split('-').map(Number);
+        if (y !== currentDate.getFullYear() || m !== currentDate.getMonth() + 1) return;
+
+        const cell = document.getElementById(`day-${y}-${m}-${d}`);
+        if (!cell) return;
+
+        const tagId = ev.tag_id ?? (ev.tags?.[0]?.tag_id ?? null);
+        if (tagId && !activeTags.has(tagId)) return;
+
+        const tag = tagId ? tags.find(t => String(t.tag_id) === String(tagId)) : null;
+        const div = document.createElement('div');
+        div.className = 'event';
+
+        if (ev.is_group === 1 || ev.group === true) {
+            div.textContent = `[Group] ${ev.username}: ${ev.title}`;
+            div.style.backgroundColor = ev.color || tag?.color || '#f39c12';
+        } else {
+            div.textContent = `${ev.username}: ${ev.title}`;
+            div.style.backgroundColor = ev.color || tag?.color || '#28a745';
+        }
+
+        cell.appendChild(div);
+    });
+}
+
+// Load the list of users who have shared their calendars with me
+function loadSharedList() {
+    const formData = new FormData();
+    formData.append('action', 'shared_list');
     formData.append('csrf_token', document.getElementById('csrfToken').value);
 
     fetch('./php/event.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(res => {
-        if (res.success) renderSharedEvents(res.shared_events);
-        });
+            if (res.success) renderSharedList(res.owners);
+        })
+        .catch(err => console.error('Error loading shared list:', err));
 }
-// show shared events on my calendar
-function renderSharedEvents(events) {
-    events.forEach(ev => {
-        const [y, m, d] = ev.event_date.split('-').map(Number);
-        if (y === currentDate.getFullYear() && m === currentDate.getMonth() + 1) {
-        const cell = document.getElementById(`day-${y}-${m}-${d}`);
-        if (cell) {
-            const div = document.createElement('div');
-            div.className = 'event';
-            div.textContent = `${ev.username}: ${ev.title}`;
-            div.style.backgroundColor = '#28a745'; 
-            cell.appendChild(div);
-        }
-        }
+
+//  Render the list of users who have shared their calendars with me
+function renderSharedList(owners) {
+    const list = document.getElementById('sharedList');
+    list.innerHTML = '';
+
+    const myLabel = document.createElement('label');
+    const myRadio = document.createElement('input');
+    myRadio.type = 'radio';
+    myRadio.name = 'calendarSelect';
+    myRadio.value = 'mine';
+    myRadio.checked = true;
+    myRadio.onchange = () => {
+        // no shared user selected
+        selectedOwners.clear(); 
+         // show my own events
+        renderCalendar();      
+    };
+    myLabel.appendChild(myRadio);
+    myLabel.append(' My Calendar');
+    list.appendChild(myLabel);
+
+
+    owners.forEach(o => {
+        const label = document.createElement('label');
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'calendarSelect';
+        radio.value = o.user_id;
+
+        radio.onchange = () => {
+            selectedOwners.clear();
+            selectedOwners.add(o.user_id);
+            // show that user's shared events
+            renderCalendar();  
+        };
+
+        label.appendChild(radio);
+        label.append(` ${o.username}`);
+        list.appendChild(label);
     });
+}
+
+function loadSharedWithOthers() {
+    const formData = new FormData();
+    formData.append('action', 'shared_with_others');
+    formData.append('csrf_token', document.getElementById('csrfToken').value);
+
+    fetch('./php/event.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) renderSharedWithOthers(res.shared_users);
+        })
+        .catch(err => console.error('Error loading shared_with_others:', err));
+}
+
+// Render the list of users the calendar is shared with
+function renderSharedWithOthers(users) {
+    const section = document.getElementById('shareSection');
+    let container = document.getElementById('sharedWithOthersList');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'sharedWithOthersList';
+        section.appendChild(container);
+    }
+    container.innerHTML = '<h4>Currently Shared With:</h4>';
+
+    if (users.length === 0) {
+        container.innerHTML += '<p style="color:gray;">No one yet.</p>';
+        return;
+    }
+
+    users.forEach(u => {
+        const div = document.createElement('div');
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.justifyContent = 'space-between';
+        div.style.margin = '4px 0';
+        div.innerHTML = `
+            <span>${u.username} (${u.can_edit ? 'Edit' : 'View Only'})</span>
+            <button class="unshareBtn" data-uid="${u.user_id}" style="padding:4px 10px; background:#dc3545; color:white; border:none; border-radius:4px; cursor:pointer;">Unshare</button>
+        `;
+        container.appendChild(div);
+    });
+
+    document.querySelectorAll('.unshareBtn').forEach(btn => {
+        btn.onclick = () => unshareUser(btn.dataset.uid);
+    });
+}
+
+// Unshare calendar with a specific user
+function unshareUser(userId) {
+    if (!confirm('Unshare your calendar with this user?')) return;
+
+    const formData = new FormData();
+    formData.append('action', 'unshare');
+    formData.append('target_user_id', userId);
+    formData.append('csrf_token', document.getElementById('csrfToken').value);
+
+    fetch('./php/event.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(res => {
+            alert(res.message);
+            if (res.success) loadSharedWithOthers();
+        })
+        .catch(err => console.error('Error unsharing calendar:', err));
 }
 
 
