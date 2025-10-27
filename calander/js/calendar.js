@@ -393,7 +393,7 @@ function renderTagFilters() {
 // share your calendar with another user
 function shareCalendar() {
     const username = document.getElementById('shareUsername').value.trim();
-    const canEdit = document.getElementById('canEdit').checked ? 1 : 0;
+    const canEdit =  0;
     if (!username) return alert('Enter a username');
     // make data to send to server
     const formData = new FormData();
