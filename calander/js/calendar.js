@@ -405,6 +405,7 @@ function shareCalendar() {
     fetch('./php/event.php', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(res => alert(res.message));
+    
 }
 
 
